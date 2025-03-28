@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Home.css";
-import { FaTasks, FaCheckCircle, FaClock, FaList, FaUserCircle } from "react-icons/fa";
+import {
+  FaTasks,
+  FaCheckCircle,
+  FaClock,
+  FaList,
+  FaUserCircle,
+  FaSignOutAlt,
+} from "react-icons/fa";
 
 function Home() {
   const navigate = useNavigate();
@@ -13,6 +20,8 @@ function Home() {
   const [dueDate, setDueDate] = useState("");
   const [showProfileOptions, setShowProfileOptions] = useState(false);
   const [userProfile, setUserProfile] = useState({ name: "", email: "", phone: "" });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -30,15 +39,13 @@ function Home() {
       phone: localStorage.getItem("phone") || "Not Available",
     });
 
-    if (role === "admin") {
-      fetchAdminTasks();
-    }
-  }, []);
+    role === "admin" ? fetchAdminTasks() : fetchUserTasks();
+  }, [navigate]);
 
   const fetchAdminTasks = async () => {
+    setLoading(true);
     try {
       const token = localStorage.getItem("token");
-
       const response = await fetch("http://localhost:5000/api/admin/tasks", {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -50,61 +57,97 @@ function Home() {
       const data = await response.json();
       setAdminTasks(data.tasks || []);
     } catch (error) {
+      setError("Error fetching admin tasks.");
       console.error("Error fetching admin tasks:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchUserTasks = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("http://localhost:5000/api/user/tasks", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setUserTasks(data.tasks || []);
+    } catch (error) {
+      setError("Error fetching user tasks.");
+      console.error("Error fetching user tasks:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
   const addTask = () => {
-    if (!taskName || !dueDate) {
+    if (!taskName.trim() || !dueDate) {
       alert("Please enter task details");
       return;
     }
-    const newTask = { name: taskName, priority, dueDate, status: "todo" };
-    setUserTasks([...userTasks, newTask]);
+    const newTask = { name: taskName.trim(), priority, dueDate, status: "todo" };
+    setUserTasks((prevTasks) => [...prevTasks, newTask]);
     setTaskName("");
     setPriority("low");
     setDueDate("");
   };
 
   const deleteTask = (index) => {
-    setUserTasks(userTasks.filter((_, i) => i !== index));
+    setUserTasks((prevTasks) => prevTasks.filter((_, i) => i !== index));
   };
 
   const submitTask = (index) => {
-    const taskToComplete = adminTasks[index];
-    taskToComplete.status = "completed";
-    setCompletedTasks([...completedTasks, taskToComplete]);
-    setAdminTasks(adminTasks.filter((_, i) => i !== index));
+    setCompletedTasks((prevTasks) => [...prevTasks, adminTasks[index]]);
+    setAdminTasks((prevTasks) => prevTasks.filter((_, i) => i !== index));
   };
 
-  const isTaskExpired = (dueDate) => {
-    return new Date(dueDate) < new Date();
-  };
+  const isTaskExpired = (dueDate) => new Date(dueDate) < new Date();
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("role");
-    localStorage.removeItem("loggedInUser");
+    localStorage.clear();
     navigate("/login");
   };
 
   return (
     <div className="dashboard">
+      {/* Sidebar */}
       <div className="sidebar">
         <h2 className="logo">TaskMe</h2>
         <ul>
-          <li><FaTasks /> Dashboard</li>
-          <li><FaList /> My To-Do List</li>
-          <li><FaCheckCircle /> Completed</li>
-          <li><FaClock /> In Progress</li>
+          <li>
+            <FaTasks /> Dashboard
+          </li>
+          <li>
+            <FaList /> My To-Do List
+          </li>
+          <li>
+            <FaCheckCircle /> Completed
+          </li>
+          <li>
+            <FaClock /> In Progress
+          </li>
         </ul>
+        <button className="logout-btn" onClick={handleLogout}>
+          <FaSignOutAlt /> Logout
+        </button>
       </div>
 
+      {/* Main Content */}
       <div className="main-content">
+        {/* Top Bar */}
         <div className="top-bar">
           <input type="text" placeholder="Search..." className="search-bar" />
           <div className="profile-section">
-            <FaUserCircle className="profile-icon" onClick={() => setShowProfileOptions(!showProfileOptions)} />
+            <FaUserCircle
+              className="profile-icon"
+              onClick={() => setShowProfileOptions(!showProfileOptions)}
+            />
             {showProfileOptions && (
               <div className="profile-dropdown">
                 <p>{userProfile.name}</p>
@@ -116,15 +159,28 @@ function Home() {
           </div>
         </div>
 
+        {/* Task Summary */}
+        <div className="task-summary">
+          <h3>Task Overview</h3>
+          <p>📌 Pending Tasks: {userTasks.length}</p>
+          <p>✅ Completed Tasks: {completedTasks.length}</p>
+        </div>
+
+        {/* Task Section */}
         <div className="task-section">
           <h2>Admin Assigned Tasks</h2>
           <div className="task-list">
             {adminTasks.length > 0 ? (
               adminTasks.map((task, index) => (
-                <div key={index} className={`task ${task.priority} ${isTaskExpired(task.dueDate) ? "expired" : ""}`}>
+                <div
+                  key={index}
+                  className={`task ${task.priority} ${isTaskExpired(task.dueDate) ? "expired" : ""}`}
+                >
                   <span>{task.name} - Due: {task.dueDate}</span>
                   {!isTaskExpired(task.dueDate) && (
-                    <button className="submit" onClick={() => submitTask(index)}>Submit</button>
+                    <button className="submit" onClick={() => submitTask(index)}>
+                      Submit
+                    </button>
                   )}
                 </div>
               ))
@@ -135,7 +191,12 @@ function Home() {
 
           <h2>My To-Do List</h2>
           <div className="add-task">
-            <input type="text" placeholder="Enter Task Name" value={taskName} onChange={(e) => setTaskName(e.target.value)} />
+            <input
+              type="text"
+              placeholder="Enter Task Name"
+              value={taskName}
+              onChange={(e) => setTaskName(e.target.value)}
+            />
             <select value={priority} onChange={(e) => setPriority(e.target.value)}>
               <option value="low">Low</option>
               <option value="medium">Medium</option>
@@ -150,6 +211,15 @@ function Home() {
               <div key={index} className={`task ${task.priority} ${isTaskExpired(task.dueDate) ? "expired" : ""}`}>
                 <span>{task.name} - Due: {task.dueDate}</span>
                 <button className="delete" onClick={() => deleteTask(index)}>Delete</button>
+              </div>
+            ))}
+          </div>
+
+          <h2>Completed Tasks</h2>
+          <div className="task-list">
+            {completedTasks.map((task, index) => (
+              <div key={index} className="task completed">
+                <span>{task.name} - Completed ✅</span>
               </div>
             ))}
           </div>

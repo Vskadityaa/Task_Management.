@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import { handleError, handleSuccess } from "../utils";
+import "./Home.css";
 
 const Login = () => {
   const [loginInfo, setLoginInfo] = useState({ email: "", password: "" });
@@ -32,33 +33,34 @@ const Login = () => {
       const result = await response.json();
       console.log("API Response:", result);
 
+      if (!response.ok) {
+        handleError(result.message || "❌ Unauthorized login attempt.");
+        setLoading(false);
+        return;
+      }
+
       if (result.success && result.token) {
-        // ✅ Store Token & Role in Local Storage
+        // ✅ Store token and user details in localStorage
         localStorage.setItem("token", result.token);
-        localStorage.setItem("loggedInUser", result.user.name);
-        localStorage.setItem("role", result.user.role || "user"); // Default to "user" if role is missing
+        localStorage.setItem("loggedInUser", JSON.stringify(result.user));
+        localStorage.setItem("role", result.user.role || "user");
 
         handleSuccess("✅ Login Successful!");
 
         // ✅ Redirect Based on Role
         setTimeout(() => {
-          navigate(result.user.role === "admin" ? "/admin-dashboard" : "/");
+          const userRole = result.user.role || "user";
+          navigate(userRole === "admin" ? "/admin-dashboard" : "/");
         }, 500);
       } else {
         handleError(result.message || "❌ Login failed.");
       }
     } catch (err) {
+      console.error("Login error:", err);
       handleError("🚨 An unexpected error occurred. Please try again.");
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleAdminLogin = () => {
-    setLoginInfo({
-      email: "admin@example.com",
-      password: "Admin@123",
-    });
   };
 
   return (
@@ -92,13 +94,7 @@ const Login = () => {
           <button type="submit" disabled={loading}>
             {loading ? "⏳ Logging in..." : "🔑 Login"}
           </button>
-          <button
-            type="button"
-            className="admin-login-button"
-            onClick={handleAdminLogin}
-          >
-            👑 Admin Login
-          </button>
+          
           <span>
             Don't have an account? <Link to="/signup">Signup</Link>
           </span>

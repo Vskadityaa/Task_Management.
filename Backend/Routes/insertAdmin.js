@@ -24,7 +24,7 @@ const insertAdmin = async () => {
   const admin = new User({
     name: "Admin",
     email: "admin@example.com",
-    password: hashedPassword,
+    password: "Admin@123",
     role: "admin"
   });
 

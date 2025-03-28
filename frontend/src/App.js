@@ -24,7 +24,7 @@ const AuthProvider = ({ children }) => {
         };
 
         checkAuth();
-        window.addEventListener("storage", checkAuth);
+        window.addEventListener("storage", checkAuth); // Listen for changes in localStorage
 
         return () => window.removeEventListener("storage", checkAuth);
     }, []);
@@ -36,14 +36,14 @@ const AuthProvider = ({ children }) => {
     );
 };
 
-// ✅ Hook to Use Auth
+// ✅ Hook to Use Auth Context
 const useAuth = () => useContext(AuthContext);
 
 // ✅ Private Route (Redirect to Login If Not Authenticated)
 const PrivateRoute = ({ children }) => {
     const { auth } = useAuth();
     const location = useLocation();
-    
+
     if (!auth.token) {
         console.log("🔴 Not logged in! Redirecting to /login");
         return <Navigate to="/login" state={{ from: location }} replace />;
@@ -63,14 +63,15 @@ const App = () => {
     return (
         <AuthProvider>
             <Routes>
+                {/* Public Routes */}
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
-                
+
                 {/* Protected Routes */}
-                <Route path="/" element={<PrivateRoute><Home /></PrivateRoute>} />
-                <Route path="/admin-dashboard" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
-                
-                {/* Redirect all unknown paths to NotFound */}
+                <Route path="/" element={<PrivateRoute><Home /></PrivateRoute>} /> {/* Only for authenticated users */}
+                <Route path="/admin-dashboard" element={<AdminRoute><AdminDashboard /></AdminRoute>} /> {/* Only for admins */}
+
+                {/* Fallback route for unknown paths */}
                 <Route path="*" element={<NotFound />} />
             </Routes>
         </AuthProvider>
